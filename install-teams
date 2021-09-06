@@ -1,3 +1,190 @@
 #!/bin/bash
 
-nativefier -a $(uname -m) teams.microsoft.com --icon teamslogo --maximize --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36."
+# A simple function to display error messages
+function error {
+  echo -e "\\e[41;30m$1\\e[0m"
+  exit 1 
+}
+
+# A simple function to wrap progress text
+function progress {
+  echo -e "\\e[34m#####################################################\\e[0m\\n\\e[96m$1\\e[0m\\n\\e[34m#####################################################\\e[0m"
+}
+
+
+# A simple function to display success messages
+function success {
+  echo -e "\\e[102;30m$1\\e[0m"
+}
+
+# To reduce some annoying output
+function reduceoutput { 
+  grep -v "apt does not have a stable CLI interface."
+}
+
+# Check if user using root privilege to run this script
+if [[ "$(id -u)" == 0 ]]; then
+	error "This script is not designed to be runned as root! Please try again as a regular user." 
+fi
+
+# Log errors
+function log {
+  tee "$directory/log.txt"
+}
+
+# Create new Teams directory and a blank file to store logs 
+progress "Creating new folder in '$HOME' folder..."
+echo ""
+echo "Removing 'Teams' folder from $HOME if exists."
+sudo rm -rf "${HOME}/Teams" 2> /dev/null
+sleep 1s
+echo "Creating folder..."
+mkdir "${HOME}/Teams" || error  "Failed creating folder in your home folder."
+directory="${HOME}/Teams"
+echo "cd to $directory"
+cd "$directory" | log || error  "Failed to cd to $directory"
+echo "Creating log file..."
+touch log.txt
+sleep 1
+echo ""
+success "Successfully created folder and log file."
+echo -e "\n"
+
+
+# Identify the system package manager and update package list
+progress "Identifying your system package manager..."
+echo ""
+if command -v apt > /dev/null; then
+    packagemanager=apt
+    echo -e "Your package manager is \e[4m$packagemanager\e[0m"
+    echo ""
+    success "Successfully identified system package manager."
+    echo -e "\\n"    
+    progress "Updating package list..."
+    ( sudo $packagemanager update 2>&1 | log || error "Failed updating package list." ) | tail -n +3
+    echo ""
+    success "Successfully updated package list."
+    echo -e "\n"
+elif command -v dnf > /dev/null; then
+    packagemanager=dnf
+    success "Your package manager is $packagemanager"
+    sudo $packagemanager check-update 2>&1 > /dev/null | log
+elif command -v yum > /dev/null; then
+    packagemanager=yum
+    success "Your package manager is $packagemanager"
+    sudo $packagemanager check-update 2>&1 > /dev/null | log
+else
+    error "Package manager not found. This script only support apt, yum and dnf."
+fi
+
+sleep 1 
+
+# Install snapd if not installed
+progress "Installing snap..."
+echo -e "\n"
+if ! command -v snap > /dev/null; then
+    sudo $packagemanager install snapd -y | tail -n +3
+else 
+    success "Snap is already installed."
+fi
+
+echo -e "\n"
+
+# Installing node using snap
+progress "Installing node..."
+echo -e "\n"
+# Uninstall nodejs node and npm first if exists
+sudo $packagemanager remove nodejs npm -y > /dev/null 2> /dev/null 
+nodeinstalled=$(snap info node | grep -o 'installed')
+if [ "$nodeinstalled" == "installed" ]; then
+   success "Node is already installed."
+else
+    sudo snap install node --classic --channel=15
+    if /snap/bin/node -v > /dev/null && command -v /snap/bin/npm -v > /dev/null ; then 
+        success "Nodejs installed sucessfully."
+    else 
+        error "Failed installing NodeJS. Try running 'snap install node --classic' or with sudo and run this script again."
+    fi
+fi 
+
+echo -e "\n"
+
+# Installing Nativefier
+progress "Installing Nativefier..."
+echo -e "\n"
+sudo ln -sfn /snap/node/current/bin/node /usr/bin/node || error "Failed make soft link to /usr/bin."
+if ! command -v nativefier > /dev/null; then
+    sudo /snap/bin/npm install -g nativefier | log || error  "Failed installing Nativefier. Try running 'npm install -g nativefier' or 'sudo /snap/bin/npm install -g nativefier' and run this script again."
+    echo ""
+    if command -v nativefier > /dev/null; then
+        success "Nativefier installed successfully."
+    else 
+        error "Failed installing nativefier. Try running 'npm install -g nativefier' or with sudo and run this script again."
+    fi
+else 
+    success "Nativefier is already installed."
+fi
+
+
+cd "${HOME}/Teams" | log || error  "Failed cd to Teams folder."
+    
+# Identifying architecture
+arch=$(uname -m)
+
+# Fix nativefier can't detect architecture
+# https://stackoverflow.com/questions/45125516/possible-values-for-uname-m
+
+if [ "$arch" == "x86_64" ] || [ "$arch" = "ia64" ]; then
+    arch=x64 
+fi
+
+if [ "$arch" = "i386" ] || [ "$arch" = "i686" ];then 
+    arch=ia32
+fi
+
+if [ "$arch" = "aarch64_be" ] || [ "$arch" = "aarch64" ] || [ "$arch" = "armv8b" ] || [ "$arch" = "armv8l" ]; then
+    arch=arm64
+fi 
+
+if [ "$arch" = "arm" ]; then
+    arch=armv7l
+fi 
+
+
+echo -e "\n"
+
+# Nativefying Teams
+if command -v nativefier > /dev/null; then
+    progress "Nativefying Teams from http://teams.microsoft.com ..."
+    cd "$directory" || error "Failed to cd to $directory"
+    nativefier -a $(uname -m) teams.microsoft.com --icon teamslogo --maximize --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36. -n Teams"
+    echo -e ""
+    success "Successfully nativefied Teams."
+else
+    error "Failed. Nativefier not found. Try running 'npm install -g nativefier' or with root 'sudo npm install -g nativefier' and run this script again. "
+fi
+
+echo -e "\n"
+
+# Create desktop & menu shortcut
+progress "Creating desktop shortcut and menu shortcut..."
+echo ""
+if ! [ "$(pwd)" == $directory ]; then 
+    cd "$directory" || error "Failed to cd to $directory."
+fi
+git clone https://github.com/ITdairy/microsoft-teams-for-linux 
+echo -e "\n"
+sudo cp $directory/microsoft-teams-for-linux/* ./ && sudo rm -rf $directory/microsoft-teams-for-linux
+sed -i "s@HOME@$HOME@g" $directory/Teams.desktop 
+sed -i "s@arch@$arch@g" $directory/Teams.desktop 
+sed -i "s@arch@$arch@g" $directory/run-microsoft-teams
+sed -i "s@HOME@$HOME@g" $directory/run-microsoft-teams
+sudo cp $directory/Teams.desktop "$HOME/.local/share/applications" | log
+sudo cp $directory/Teams.desktop "$HOME/Desktop" | log
+sudo cp $directory/run-microsoft-teams $directory/Teams-linux-$arch
+sudo chmod +x $directory/Teams-linux-$arch/run-Teams
+success "Successfully created desktop and menu shortcut."
+echo -e "\n\n"
+success "Done! You should be able to run Teams from desktop and menu bar."
+echo -e "\n\n"
+cd "$HOME"  || exit 
