@@ -177,12 +177,8 @@ echo -e "\n"
 sudo cp $directory/microsoft-teams-for-linux/* ./ && sudo rm -rf $directory/microsoft-teams-for-linux
 sed -i "s@HOME@$HOME@g" $directory/Teams.desktop 
 sed -i "s@arch@$arch@g" $directory/Teams.desktop 
-sed -i "s@arch@$arch@g" $directory/run-microsoft-teams
-sed -i "s@HOME@$HOME@g" $directory/run-microsoft-teams
 sudo cp $directory/Teams.desktop "$HOME/.local/share/applications" | log
 sudo cp $directory/Teams.desktop "$HOME/Desktop" | log
-sudo cp $directory/run-microsoft-teams $directory/Teams-linux-$arch
-sudo chmod +x $directory/Teams-linux-$arch/run-Teams
 success "Successfully created desktop and menu shortcut."
 echo -e "\n\n"
 success "Done! You should be able to run Teams from desktop and menu bar."
