@@ -27,10 +27,6 @@ if [[ "$(id -u)" == 0 ]]; then
 	error "This script is not designed to be runned as root! Please try again as a regular user." 
 fi
 
-# Log errors
-function log {
-  tee "$directory/log.txt"
-}
 
 # Create new Teams directory and a blank file to store logs 
 progress "Creating new folder in '$HOME' folder..."
@@ -42,7 +38,12 @@ echo "Creating folder..."
 mkdir "${HOME}/Teams" || error  "Failed creating folder in your home folder."
 directory="${HOME}/Teams"
 echo "cd to $directory"
-cd "$directory" | log || error  "Failed to cd to $directory"
+cd $directory || error  "Failed to cd to $directory"
+pwd
+echo "Cloning Github repo..."
+git clone https://github.com/ITdairy/microsoft-teams-for-linux
+pwd
+sudo cp $directory/microsoft-teams-for-linux/* ./
 echo "Creating log file..."
 touch log.txt
 sleep 1
@@ -61,60 +62,72 @@ if command -v apt > /dev/null; then
     success "Successfully identified system package manager."
     echo -e "\\n"    
     progress "Updating package list..."
-    ( sudo $packagemanager update 2>&1 | log || error "Failed updating package list." ) | tail -n +3
+    ( sudo $packagemanager update 2>&1  || error "Failed updating package list." ) | tail -n +3
     echo ""
     success "Successfully updated package list."
     echo -e "\n"
 elif command -v dnf > /dev/null; then
     packagemanager=dnf
     success "Your package manager is $packagemanager"
-    sudo $packagemanager check-update 2>&1 > /dev/null | log
+    sudo $packagemanager check-update 2>&1 > /dev/null 
 elif command -v yum > /dev/null; then
     packagemanager=yum
     success "Your package manager is $packagemanager"
-    sudo $packagemanager check-update 2>&1 > /dev/null | log
+    sudo $packagemanager check-update 2>&1 > /dev/null 
 else
     error "Package manager not found. This script only support apt, yum and dnf."
 fi
 
 sleep 1 
 
-# Install snapd if not installed
-progress "Installing snap..."
-echo -e "\n"
-if ! command -v snap > /dev/null; then
-    sudo $packagemanager install snapd -y | tail -n +3
-else 
-    success "Snap is already installed."
-fi
-
-echo -e "\n"
-
-# Installing node using snap
+# Installing node
 progress "Installing node..."
 echo -e "\n"
-# Uninstall nodejs node and npm first if exists
-sudo $packagemanager remove nodejs npm -y > /dev/null 2> /dev/null 
-nodeinstalled=$(snap info node | grep -o 'installed')
-if [ "$nodeinstalled" == "installed" ]; then
-   success "Node is already installed."
-else
-    sudo snap install node --classic --channel=15
-    if /snap/bin/node -v > /dev/null && command -v /snap/bin/npm -v > /dev/null ; then 
-        success "Nodejs installed sucessfully."
-    else 
-        error "Failed installing NodeJS. Try running 'snap install node --classic' or with sudo and run this script again."
-    fi
-fi 
+nodeversion=$(node -v | tail -c +2 | head -c 2)
+npmversion=$(npm -v | head -c 1)
+if [[ "$nodeversion" == "16" ]] || [[ "$nodeversion" == "15" ]] || [[ "$nodeversion" == "14" ]] || [[ "$nodeversion" ==  "13" ]]; then 
+    echo "Node version is compatible with Nativefier."
+else 
+    echo "Node version is not compatible with Nativefier."
+    updatenode=1
+fi
 
+if [[ "$npmversion" == "7" ]] ; then 
+    echo "NPM version is compatible with Nativefier."
+else 
+    echo "NPM version is not compatible with Nativefier."
+    updatenode=1
+fi
+
+if [[ "$updatenode" == "1" ]]; then
+    sudo $packagemanager remove nodejs npm -y > /dev/null 2> /dev/null 
+    sudo snap remove node || snap remove node
+    if ! command -v nvm > /dev/null; then
+        if command -v curl > /dev/null; then
+            curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+            export NVM_DIR="$HOME/.config/nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  
+            [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  
+            nvm install 16.8.0 || nvm install 16.8.0
+        elif command -v wget > /dev/null; then
+            wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+            nvm install 16.8.0 || sudo nvm install 16.8.0
+            export NVM_DIR="$HOME/.config/nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  
+            [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" 
+        fi
+    fi
+fi
+
+        
+    
 echo -e "\n"
 
 # Installing Nativefier
 progress "Installing Nativefier..."
 echo -e "\n"
-sudo ln -sfn /snap/node/current/bin/node /usr/bin/node || error "Failed make soft link to /usr/bin."
 if ! command -v nativefier > /dev/null; then
-    sudo /snap/bin/npm install -g nativefier | log || error  "Failed installing Nativefier. Try running 'npm install -g nativefier' or 'sudo /snap/bin/npm install -g nativefier' and run this script again."
+    npm install -g nativefier  || error  "Failed installing Nativefier. Try running 'npm install -g nativefier' or 'sudo /snap/bin/npm install -g nativefier' and run this script again."
     echo ""
     if command -v nativefier > /dev/null; then
         success "Nativefier installed successfully."
@@ -126,8 +139,8 @@ else
 fi
 
 
-cd "${HOME}/Teams" | log || error  "Failed cd to Teams folder."
-    
+cd $directory  || error  "Failed cd to Teams folder."
+
 # Identifying architecture
 arch=$(uname -m)
 
@@ -157,7 +170,7 @@ echo -e "\n"
 if command -v nativefier > /dev/null; then
     progress "Nativefying Teams from http://teams.microsoft.com ..."
     cd "$directory" || error "Failed to cd to $directory"
-    nativefier -a $(uname -m) teams.microsoft.com --icon teamslogo --maximize --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36. -n Teams"
+    nativefier -n Teams -a $(uname -m) https://teams.microsoft.com --icon $directory/teamslogo.png --maximize --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36."
     echo -e ""
     success "Successfully nativefied Teams."
 else
@@ -172,13 +185,13 @@ echo ""
 if ! [ "$(pwd)" == $directory ]; then 
     cd "$directory" || error "Failed to cd to $directory."
 fi
-git clone https://github.com/ITdairy/microsoft-teams-for-linux 
+
 echo -e "\n"
 sudo cp $directory/microsoft-teams-for-linux/* ./ && sudo rm -rf $directory/microsoft-teams-for-linux
 sed -i "s@HOME@$HOME@g" $directory/Teams.desktop 
 sed -i "s@arch@$arch@g" $directory/Teams.desktop 
-sudo cp $directory/Teams.desktop "$HOME/.local/share/applications" | log
-sudo cp $directory/Teams.desktop "$HOME/Desktop" | log
+sudo cp $directory/Teams.desktop "$HOME/.local/share/applications" 
+sudo cp $directory/Teams.desktop "$HOME/Desktop" 
 success "Successfully created desktop and menu shortcut."
 echo -e "\n\n"
 success "Done! You should be able to run Teams from desktop and menu bar."
