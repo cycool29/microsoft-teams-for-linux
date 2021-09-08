@@ -40,7 +40,7 @@ directory="${HOME}/Teams"
 echo "cd to $directory"
 cd $directory || error  "Failed to cd to $directory"
 pwd
-echo "Cloning Github repo..."
+echo "Cloning Github repo for icon and desktop entry ..."
 git clone https://github.com/ITdairy/microsoft-teams-for-linux
 pwd
 sudo cp $directory/microsoft-teams-for-linux/* ./
@@ -170,7 +170,7 @@ echo -e "\n"
 if command -v nativefier > /dev/null; then
     progress "Nativefying Teams from http://teams.microsoft.com ..."
     cd "$directory" || error "Failed to cd to $directory"
-    nativefier -n Teams -a $(uname -m) https://teams.microsoft.com --icon $directory/teamslogo.png --maximize --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36."
+    nativefier -n "Teams" --internal-urls "./.*/" "https://teams.microsoft.com/_#" -a arch --icon $directory/teamslogo.png --user-agent "Mozilla/5.0 (X11; CrOS armv7l 13597.84.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.187 Safari/537.36" --maximize
     echo -e ""
     success "Successfully nativefied Teams."
 else
