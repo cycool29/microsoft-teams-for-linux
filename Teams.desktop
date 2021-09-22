@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Teams
 Type=Application
-Exec=directory/Teams-linux-arch/Teams
+Exec=directory/Teams
 Icon=directory/teamslogo.png
 Categories=Network;Internet
