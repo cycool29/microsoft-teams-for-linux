@@ -2,5 +2,5 @@
 Name=Teams
 Type=Application
 Exec=directory/Teams-linux-arch/Teams
-Icon=directory/teamslogo.png
+Icon=directory/shortcut.png
 Categories=Network;Internet
