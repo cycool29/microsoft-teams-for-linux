@@ -170,7 +170,7 @@ echo -e "\n"
 if command -v nativefier > /dev/null; then
     progress "Nativefying Teams from http://teams.microsoft.com ..."
     cd "$directory" || error "Failed to cd to $directory"
-    nativefier -n Teams -a $(uname -m) https://teams.microsoft.com --icon $directory/teamslogo.png --portable --maximize --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36."
+    nativefier -n Teams -a $arch  --internal-urls "./.*/" --icon $directory/teamslogo.png --portable --maximize --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36." "https://teams.microsoft.com/_#" 
     echo -e ""
     success "Successfully nativefied Teams."
 else
